@@ -87,12 +87,19 @@ class ProtobufWhiteBoardProvider extends ChangeNotifier {
       createNewWhiteBoard();
     }
 
-    final point = Point(x: position.dx, y: position.dy, pressure: 1.0);
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final point = Point(
+      x: position.dx,
+      y: position.dy,
+      pressure: 1.0,
+      timestamp: 0,
+    );
 
     _currentStroke = Stroke(
       id: const Uuid().v4(),
       points: [point],
-      startTime: DateTime.now().millisecondsSinceEpoch,
+      startTime: now,
+      endTime: now,
       style: _strokeStyle,
     );
 
@@ -103,10 +110,19 @@ class ProtobufWhiteBoardProvider extends ChangeNotifier {
   void updateStroke(Offset position) {
     if (_currentStroke == null) return;
 
-    final point = Point(x: position.dx, y: position.dy, pressure: 1.0);
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final relativeTimestamp = now - _currentStroke!.startTime;
+
+    final point = Point(
+      x: position.dx,
+      y: position.dy,
+      pressure: 1.0,
+      timestamp: relativeTimestamp,
+    );
 
     _currentStroke = _currentStroke!.copyWith(
       points: [..._currentStroke!.points, point],
+      endTime: now,
     );
 
     notifyListeners();

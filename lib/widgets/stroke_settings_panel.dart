@@ -4,7 +4,7 @@ import '../providers/whiteboard_provider.dart';
 
 /// پنل تنظیمات خط با قابلیت تنظیم نرمی، رنگ و ضخامت
 class StrokeSettingsPanel extends StatelessWidget {
-  const StrokeSettingsPanel({Key? key}) : super(key: key);
+  const StrokeSettingsPanel({super.key});
 
   @override
   Widget build(BuildContext context) {

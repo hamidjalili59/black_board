@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/protobuf_whiteboard_provider.dart';
 import '../widgets/drawing_canvas_protobuf.dart';
 import '../widgets/stroke_settings_panel_protobuf.dart';
+import '../models/white_board.dart';
 
 /// صفحه اصلی وایت‌بورد با پروتوباف
 class ProtobufWhiteBoardScreen extends StatefulWidget {
@@ -67,6 +68,18 @@ class _ProtobufWhiteBoardScreenState extends State<ProtobufWhiteBoardScreen> {
                     : () {
                       provider.undoLastStroke();
                     },
+          ),
+
+          // دکمه بازپخش
+          IconButton(
+            icon: const Icon(Icons.slideshow),
+            onPressed:
+                whiteBoard == null
+                    ? null
+                    : () {
+                      _navigateToPlayback(context, whiteBoard);
+                    },
+            tooltip: 'بازپخش وایت‌بورد',
           ),
 
           IconButton(
@@ -228,7 +241,16 @@ class _ProtobufWhiteBoardScreenState extends State<ProtobufWhiteBoardScreen> {
     }
   }
 
-  /// دیالوگ بارگیری وایت‌بورد
+  /// انتقال به صفحه بازپخش
+  void _navigateToPlayback(BuildContext context, WhiteBoard whiteBoard) {
+    Navigator.pushNamed(
+      context,
+      '/playback',
+      arguments: {'whiteBoard': whiteBoard},
+    );
+  }
+
+  /// دیالوگ بارگیری وایت‌بورد و اضافه کردن دکمه بازپخش
   Future<void> _showLoadWhiteBoardDialog(BuildContext contextOuter) async {
     final provider = Provider.of<ProtobufWhiteBoardProvider>(
       contextOuter,
@@ -248,8 +270,8 @@ class _ProtobufWhiteBoardScreenState extends State<ProtobufWhiteBoardScreen> {
       return;
     }
 
-    // نمایش دیالوگ انتخاب وایت‌بورد
-    final selectedId = await showDialog<String>(
+    // نمایش دیالوگ انتخاب وایت‌بورد همراه با گزینه بازپخش
+    final result = await showDialog<Map<String, dynamic>>(
       context: contextOuter,
       builder:
           (context) => AlertDialog(
@@ -263,7 +285,20 @@ class _ProtobufWhiteBoardScreenState extends State<ProtobufWhiteBoardScreen> {
                   final id = provider.savedWhiteBoardIds[index];
                   return ListTile(
                     title: Text('وایت‌بورد $id'),
-                    onTap: () => Navigator.of(context).pop(id),
+                    onTap:
+                        () => Navigator.of(
+                          context,
+                        ).pop({'id': id, 'action': 'load'}),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.slideshow),
+                      tooltip: 'بازپخش',
+                      onPressed: () async {
+                        // بارگیری وایت‌بورد برای بازپخش
+                        Navigator.of(
+                          context,
+                        ).pop({'id': id, 'action': 'playback'});
+                      },
+                    ),
                   );
                 },
               ),
@@ -277,28 +312,37 @@ class _ProtobufWhiteBoardScreenState extends State<ProtobufWhiteBoardScreen> {
           ),
     );
 
-    if (selectedId != null && mounted) {
+    if (result != null && mounted) {
+      final String selectedId = result['id'];
+      final String action = result['action'];
+
+      // بارگیری وایت‌بورد
       await provider.loadWhiteBoard(selectedId);
 
-      // نمایش پیام متناسب با نتیجه بارگذاری
-      if (!mounted) return;
-
-      if (provider.whiteBoard != null) {
-        ScaffoldMessenger.of(contextOuter).showSnackBar(
-          SnackBar(
-            content: Text(
-              'وایت‌بورد با شناسه $selectedId با موفقیت بارگذاری شد',
+      if (!mounted || provider.whiteBoard == null) {
+        // در صورت خطا در بارگیری
+        if (mounted) {
+          ScaffoldMessenger.of(contextOuter).showSnackBar(
+            SnackBar(
+              content: Text('خطا در بارگیری وایت‌بورد با شناسه $selectedId'),
+              backgroundColor: Colors.red,
             ),
-            backgroundColor: Colors.green,
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(contextOuter).showSnackBar(
-          SnackBar(
-            content: Text('خطا در بارگذاری وایت‌بورد با شناسه $selectedId'),
-            backgroundColor: Colors.red,
-          ),
-        );
+          );
+        }
+        return;
+      }
+
+      // پیام موفقیت آمیز بودن بارگیری
+      ScaffoldMessenger.of(contextOuter).showSnackBar(
+        SnackBar(
+          content: Text('وایت‌بورد با شناسه $selectedId با موفقیت بارگیری شد'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      // اگر اکشن بازپخش بود، به صفحه بازپخش برویم
+      if (action == 'playback') {
+        _navigateToPlayback(contextOuter, provider.whiteBoard!);
       }
     }
   }

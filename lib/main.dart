@@ -5,6 +5,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'providers/protobuf_whiteboard_provider.dart';
 import 'views/protobuf_whiteboard_screen.dart';
 import 'views/protobuf_test_screen.dart';
+import 'views/whiteboard_playback_view.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -56,6 +57,17 @@ class MyApp extends StatelessWidget {
         routes: {
           '/': (context) => const ProtobufWhiteBoardScreen(),
           '/protobuf_test': (context) => const ProtobufTestScreen(),
+          '/playback': (context) {
+            final args =
+                ModalRoute.of(context)?.settings.arguments
+                    as Map<String, dynamic>?;
+            final whiteBoard = args?['whiteBoard'];
+            if (whiteBoard != null) {
+              return WhiteBoardPlaybackView(whiteBoard: whiteBoard);
+            }
+            // برگشت به صفحه اصلی در صورت نبود داده
+            return const ProtobufWhiteBoardScreen();
+          },
         },
       ),
     );
