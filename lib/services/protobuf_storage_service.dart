@@ -160,7 +160,7 @@ class ProtobufStorageService {
               .whereType<File>()
               .where((file) => file.path.endsWith(_fileExtension))
               .map((file) {
-                final fileName = file.path.split('/').last;
+                final fileName = file.path.split(Platform.pathSeparator).last;
                 return fileName.substring(
                   0,
                   fileName.length - _fileExtension.length,

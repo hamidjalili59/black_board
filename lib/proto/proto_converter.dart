@@ -29,8 +29,16 @@ class ProtoConverter {
 
   /// تبدیل مدل سبک خط داخلی به Protobuf
   static StrokeStyleProto strokeStyleToProto(StrokeStyle style) {
+    final color = style.color;
+    // ایجاد مقدار رنگ به صورت دستی بدون استفاده از .value
+    final colorValue =
+        (color.alpha << 24) |
+        (color.red << 16) |
+        (color.green << 8) |
+        color.blue;
+
     return StrokeStyleProto(
-      color: style.color.value.toRadixString(16).padLeft(8, '0'),
+      color: colorValue.toRadixString(16).padLeft(8, '0'),
       width: style.thickness,
       isEraser: style.type == StrokeType.dotted,
     );

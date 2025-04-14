@@ -1,16 +1,126 @@
-# black_board
+# Black Board - وایت‌بورد هوشمند
 
-A new Flutter project.
+پروژه **Black Board** یک اپلیکیشن وایت‌بورد هوشمند است که با استفاده از فلاتر (Flutter) توسعه داده شده و از فرمت Protobuf برای ذخیره‌سازی بهینه خطوط و طرح‌ها استفاده می‌کند.
 
-## Getting Started
+## ویژگی‌های اصلی
 
-This project is a starting point for a Flutter application.
+- **رسم آزادانه**: امکان رسم خطوط با ضخامت‌ها و رنگ‌های مختلف
+- **ذخیره‌سازی بهینه**: استفاده از فرمت فشرده Protobuf برای ذخیره‌سازی
+- **بهینه‌سازی خودکار**: کاهش حجم فایل‌ها با حذف نقاط اضافی و فشرده‌سازی
+- **رابط کاربری چندزبانه**: پشتیبانی از زبان فارسی
+- **قابلیت undo و clear**: امکان بازگشت به عقب و پاک کردن تمام محتوا
+- **قابل استفاده روی چند پلتفرم**: سازگار با ویندوز، اندروید و iOS
 
-A few resources to get you started if this is your first Flutter project:
+## ساختار پروژه
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+ساختار اصلی پروژه به صورت زیر است:
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```
+lib/
+├── main.dart                           # نقطه ورود برنامه
+├── models/                             # مدل‌های داده‌ای
+│   ├── drawing_model.dart              # مدل‌های اصلی در حالت JSON
+│   ├── point.dart                      # مدل نقطه
+│   ├── stroke.dart                     # مدل خط
+│   ├── stroke_style.dart               # مدل استایل خط
+│   └── white_board.dart                # مدل وایت‌بورد
+├── proto/                              # تعاریف و فایل‌های Protobuf
+│   ├── proto_converter.dart            # تبدیل‌کننده بین مدل داخلی و Protobuf
+│   └── black_board.proto               # تعریف ساختار داده Protobuf
+├── providers/                          # مدیریت وضعیت
+│   ├── protobuf_whiteboard_provider.dart # Provider اصلی برای وایت‌بورد با Protobuf
+│   └── whiteboard_provider.dart          # Provider قدیمی برای پشتیبانی
+├── services/                           # سرویس‌های مختلف
+│   ├── grpc_service.dart               # سرویس gRPC
+│   ├── proto_buffer_serializer.dart    # سریالایزر/دسریالایزر Protobuf
+│   ├── protobuf_converter.dart         # تبدیل‌کننده داده به/از Protobuf
+│   ├── protobuf_storage.dart           # ذخیره‌سازی فایل‌های Protobuf
+│   └── storage_service.dart            # سرویس ذخیره‌سازی عمومی
+├── views/                              # صفحات اصلی
+│   ├── protobuf_test_screen.dart       # صفحه تست Protobuf
+│   └── protobuf_whiteboard_screen.dart # صفحه اصلی وایت‌بورد
+└── widgets/                            # ویجت‌های قابل استفاده مجدد
+    ├── drawing_canvas_protobuf.dart    # کنوس رسم برای Protobuf
+    ├── stroke_settings_panel.dart      # پنل تنظیمات خط
+    └── whiteboard_canvas.dart          # کنوس وایت‌بورد
+```
+
+## نحوه کارکرد
+
+### مدل داده‌ای
+
+برنامه از سه مدل اصلی استفاده می‌کند:
+
+1. **Point**: نمایانگر یک نقطه در صفحه با مختصات x و y و مقدار فشار
+2. **Stroke**: مجموعه‌ای از نقاط که یک خط را تشکیل می‌دهند به همراه استایل آن
+3. **WhiteBoard**: مجموعه‌ای از خطوط که یک وایت‌بورد را تشکیل می‌دهند
+
+### مراحل ذخیره‌سازی
+
+ذخیره‌سازی به صورت زیر انجام می‌شود:
+
+1. **بهینه‌سازی**: نقاط اضافی و بسیار نزدیک به هم حذف می‌شوند
+2. **تبدیل به Protobuf**: داده‌ها به فرمت Protobuf تبدیل می‌شوند
+3. **فشرده‌سازی**: داده‌ها با GZIP فشرده می‌شوند
+4. **ذخیره**: فایل نهایی در دایرکتوری `whiteboards` ذخیره می‌شود
+
+### بارگیری
+
+بارگیری فایل‌ها به صورت زیر انجام می‌شود:
+
+1. **خواندن فایل**: فایل از دایرکتوری `whiteboards` خوانده می‌شود
+2. **تشخیص فشرده‌سازی**: اگر فایل فشرده باشد، فشرده‌گشایی انجام می‌شود
+3. **تبدیل از Protobuf**: داده‌ها از Protobuf به مدل داخلی تبدیل می‌شوند
+4. **نمایش**: محتوا روی وایت‌بورد نمایش داده می‌شود
+
+## بهینه‌سازی‌ها
+
+برنامه از چندین روش برای بهینه‌سازی داده‌ها استفاده می‌کند:
+
+1. **حذف نقاط اضافی**: نقاطی که فاصله کمی با هم دارند (با آستانه 2 پیکسل) حذف می‌شوند
+2. **فشرده‌سازی GZIP**: داده‌ها با الگوریتم GZIP فشرده می‌شوند (معمولاً 70-90% کاهش حجم)
+3. **استفاده از Protobuf**: فرمت Protobuf ذاتاً فشرده‌تر از JSON است
+4. **ذخیره بهینه رنگ‌ها**: رنگ‌ها به صورت مقادیر عددی ذخیره می‌شوند
+
+## راه‌اندازی پروژه
+
+### پیش‌نیازها
+
+- Flutter SDK 3.0 یا بالاتر
+- Dart SDK 2.18 یا بالاتر
+- مخزن گیت
+
+### نصب و اجرا
+
+1. مخزن را کلون کنید:
+```bash
+git clone https://github.com/yourusername/black_board.git
+cd black_board
+```
+
+2. وابستگی‌ها را نصب کنید:
+```bash
+flutter pub get
+```
+
+3. برنامه را اجرا کنید:
+```bash
+flutter run
+```
+
+## توسعه بیشتر
+
+برای توسعه بیشتر این پروژه، می‌توانید موارد زیر را در نظر بگیرید:
+
+- **اشتراک‌گذاری**: افزودن قابلیت اشتراک‌گذاری وایت‌بوردها با دیگران
+- **همکاری همزمان**: امکان کار چند کاربر روی یک وایت‌بورد با استفاده از gRPC
+- **تشخیص اشکال**: تشخیص خودکار اشکال هندسی رسم شده
+- **راهنمای کاربر**: افزودن آموزش داخل برنامه برای استفاده بهتر
+
+## توسعه‌دهندگان
+
+این پروژه توسط تیم Black Board توسعه داده شده است. برای مشارکت یا پیشنهادات، لطفاً Issue ایجاد کنید.
+
+## مجوز
+
+این پروژه تحت مجوز MIT منتشر شده است.

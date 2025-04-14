@@ -54,8 +54,13 @@ class StrokeStyle {
   Map<String, dynamic> toJson() => _$StrokeStyleToJson(this);
 
   factory StrokeStyle.defaultStyle() {
+    final color = ui.Color.fromARGB(255, 0, 0, 0);
     return StrokeStyle(
-      color: ui.Color.fromARGB(255, 0, 0, 0).value,
+      color:
+          (color.red << 16) |
+          (color.green << 8) |
+          color.blue |
+          (color.alpha << 24),
       width: 3.0,
       smoothness: 0.5,
     );
@@ -77,9 +82,7 @@ class Stroke {
   Map<String, dynamic> toJson() => _$StrokeToJson(this);
 
   static String _generateId() {
-    return DateTime.now().millisecondsSinceEpoch.toString() +
-        "_" +
-        Random().nextInt(1000).toString();
+    return "${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(1000)}";
   }
 
   ui.Path toPath() {
@@ -148,9 +151,7 @@ class WhiteBoard {
   Map<String, dynamic> toJson() => _$WhiteBoardToJson(this);
 
   static String _generateId() {
-    return DateTime.now().millisecondsSinceEpoch.toString() +
-        "_" +
-        Random().nextInt(10000).toString();
+    return "${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(10000)}";
   }
 
   WhiteBoard copyWith({

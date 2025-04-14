@@ -38,9 +38,10 @@ class _ProtobufWhiteBoardScreenState extends State<ProtobufWhiteBoardScreen> {
                 provider.isSaving
                     ? null
                     : () async {
+                      final scaffoldMessenger = ScaffoldMessenger.of(context);
                       final result = await provider.saveCurrentWhiteBoard();
                       if (result && mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
+                        scaffoldMessenger.showSnackBar(
                           const SnackBar(
                             content: Text('وایت‌بورد با موفقیت ذخیره شد'),
                           ),
@@ -228,9 +229,9 @@ class _ProtobufWhiteBoardScreenState extends State<ProtobufWhiteBoardScreen> {
   }
 
   /// دیالوگ بارگیری وایت‌بورد
-  Future<void> _showLoadWhiteBoardDialog(BuildContext context) async {
+  Future<void> _showLoadWhiteBoardDialog(BuildContext contextOuter) async {
     final provider = Provider.of<ProtobufWhiteBoardProvider>(
-      context,
+      contextOuter,
       listen: false,
     );
 
@@ -241,7 +242,7 @@ class _ProtobufWhiteBoardScreenState extends State<ProtobufWhiteBoardScreen> {
 
     if (provider.savedWhiteBoardIds.isEmpty) {
       // اگر وایت‌بوردی وجود نداشت
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(contextOuter).showSnackBar(
         const SnackBar(content: Text('هیچ وایت‌بورد ذخیره شده‌ای وجود ندارد')),
       );
       return;
@@ -249,7 +250,7 @@ class _ProtobufWhiteBoardScreenState extends State<ProtobufWhiteBoardScreen> {
 
     // نمایش دیالوگ انتخاب وایت‌بورد
     final selectedId = await showDialog<String>(
-      context: context,
+      context: contextOuter,
       builder:
           (context) => AlertDialog(
             title: const Text('انتخاب وایت‌بورد'),
@@ -280,8 +281,10 @@ class _ProtobufWhiteBoardScreenState extends State<ProtobufWhiteBoardScreen> {
       await provider.loadWhiteBoard(selectedId);
 
       // نمایش پیام متناسب با نتیجه بارگذاری
-      if (provider.whiteBoard != null && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+      if (!mounted) return;
+
+      if (provider.whiteBoard != null) {
+        ScaffoldMessenger.of(contextOuter).showSnackBar(
           SnackBar(
             content: Text(
               'وایت‌بورد با شناسه $selectedId با موفقیت بارگذاری شد',
@@ -289,8 +292,8 @@ class _ProtobufWhiteBoardScreenState extends State<ProtobufWhiteBoardScreen> {
             backgroundColor: Colors.green,
           ),
         );
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+      } else {
+        ScaffoldMessenger.of(contextOuter).showSnackBar(
           SnackBar(
             content: Text('خطا در بارگذاری وایت‌بورد با شناسه $selectedId'),
             backgroundColor: Colors.red,
