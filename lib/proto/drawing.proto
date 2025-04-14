@@ -1,0 +1,89 @@
+syntax = "proto3";
+
+package blackboard;
+
+option java_package = "com.blackboard.proto";
+option java_multiple_files = true;
+
+// نقطه خطی که روی وایت‌بورد کشیده می‌شود
+message Point {
+  double x = 1;
+  double y = 2;
+  double pressure = 3;
+  int64 timestamp = 4;
+}
+
+// تنظیمات استایل خط
+message StrokeStyle {
+  string color = 1;
+  double width = 2;
+  bool is_eraser = 3;
+}
+
+// یک خط کشیده شده روی وایت‌بورد
+message Stroke {
+  string id = 1;
+  repeated Point points = 2 [packed=true];
+  StrokeStyle style = 3;
+}
+
+// کل محتوای یک وایت‌بورد
+message WhiteBoard {
+  string id = 1;
+  string name = 2;
+  int64 created_at = 3;
+  int64 updated_at = 4;
+  repeated Stroke strokes = 5;
+}
+
+// پیام برای ذخیره وایت‌بورد
+message SaveWhiteBoardRequest {
+  WhiteBoard white_board = 1;
+}
+
+// پاسخ ذخیره وایت‌بورد
+message SaveWhiteBoardResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// درخواست بارگیری وایت‌بورد
+message LoadWhiteBoardRequest {
+  string id = 1;
+}
+
+// پاسخ بارگیری وایت‌بورد
+message LoadWhiteBoardResponse {
+  bool success = 1;
+  WhiteBoard white_board = 2;
+  string message = 3;
+}
+
+// درخواست لیست وایت‌بوردها
+message ListWhiteBoardsRequest {
+  // فیلد خالی برای گسترش آتی
+}
+
+// یک سطر از لیست وایت‌بوردها
+message WhiteBoardListItem {
+  string id = 1;
+  string name = 2;
+  int64 updated_at = 3;
+}
+
+// پاسخ لیست وایت‌بوردها
+message ListWhiteBoardsResponse {
+  repeated WhiteBoardListItem white_boards = 1;
+}
+
+// سرویس وایت‌بورد برای ارتباط gRPC
+service WhiteBoardService {
+  // ذخیره یک وایت‌بورد
+  rpc SaveWhiteBoard(SaveWhiteBoardRequest) returns (SaveWhiteBoardResponse);
+  
+  // بارگیری یک وایت‌بورد با شناسه
+  rpc LoadWhiteBoard(LoadWhiteBoardRequest) returns (LoadWhiteBoardResponse);
+  
+  // دریافت لیست همه وایت‌بوردها
+  rpc ListWhiteBoards(ListWhiteBoardsRequest) returns (ListWhiteBoardsResponse);
+} 
