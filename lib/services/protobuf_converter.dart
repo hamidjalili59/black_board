@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 // موقتاً مدل‌های مورد نیاز را import می‌کنیم
 import '../models/point.dart';
@@ -6,56 +5,45 @@ import '../models/stroke.dart';
 import '../models/stroke_style.dart';
 import '../models/white_board.dart';
 import 'dart:ui';
-
-// ما فرض می‌کنیم که فایل‌های تولید شده از proto در این مسیر قرار دارند
-// import '../generated/drawing.pb.dart' as pb;
+import '../generated/proto_models.dart';
 
 /// سرویس تبدیل بین مدل‌های داخلی و Protobuf
 class ProtobufConverter {
   /// تبدیل مدل داخلی WhiteBoard به Protobuf
-  static dynamic convertToProto(WhiteBoard model) {
+  static WhiteBoardProto convertToProto(WhiteBoard model) {
     try {
-      /*
-      final proto =
-          pb.WhiteBoard()
-            ..id = model.id
-            ..name = model.name
-            ..createdAt = model.createdAt
-            ..updatedAt = model.updatedAt;
+      final strokes =
+          model.strokes.map((stroke) {
+            // تبدیل نقاط
+            final points =
+                stroke.points
+                    .map(
+                      (point) => PointProto(
+                        x: point.x,
+                        y: point.y,
+                        pressure: point.pressure,
+                        timestamp: DateTime.now().millisecondsSinceEpoch,
+                      ),
+                    )
+                    .toList();
 
-      // تبدیل خطوط
-      for (final stroke in model.strokes) {
-        final protoStroke = pb.Stroke()..id = stroke.id;
+            // تبدیل سبک خط
+            final style = StrokeStyleProto(
+              color: stroke.style.color.value.toRadixString(16).padLeft(8, '0'),
+              width: stroke.style.thickness,
+              isEraser: stroke.style.type == StrokeType.dotted,
+            );
 
-        // تبدیل سبک خط
-        final protoStyle =
-            pb.StrokeStyle()
-              ..color = stroke.style.color
-              ..width = stroke.style.thickness // width به thickness تغییر کرده
-              ..smoothness = stroke.style.smoothness ?? 0;
+            return StrokeProto(id: stroke.id, points: points, style: style);
+          }).toList();
 
-        protoStroke.style = protoStyle;
-
-        // تبدیل نقاط
-        for (final point in stroke.points) {
-          final protoPoint =
-              pb.Point()
-                ..x = point.x
-                ..y = point.y
-                ..pressure = point.pressure
-                ..timestamp = DateTime.now().millisecondsSinceEpoch;
-
-          protoStroke.points.add(protoPoint);
-        }
-
-        proto.strokes.add(protoStroke);
-      }
-
-      return proto;
-      */
-
-      // تا زمانی که فایل‌های protobuf تولید شوند، یک مقدار پیش‌فرض برمی‌گردانیم
-      return Uint8List(0);
+      return WhiteBoardProto(
+        id: model.id,
+        name: model.name,
+        createdAt: model.createdAt.millisecondsSinceEpoch,
+        updatedAt: model.updatedAt.millisecondsSinceEpoch,
+        strokes: strokes,
+      );
     } catch (e) {
       debugPrint('خطا در تبدیل به Protobuf: $e');
       rethrow;
@@ -63,9 +51,8 @@ class ProtobufConverter {
   }
 
   /// تبدیل Protobuf به مدل داخلی WhiteBoard
-  static WhiteBoard convertFromProto(dynamic proto) {
+  static WhiteBoard convertFromProto(WhiteBoardProto proto) {
     try {
-      /*
       // تبدیل خطوط
       final strokes =
           proto.strokes.map((protoStroke) {
@@ -85,14 +72,17 @@ class ProtobufConverter {
             final style = StrokeStyle(
               color: Color(int.parse(protoStroke.style.color, radix: 16)),
               thickness: protoStroke.style.width,
-              type: protoStroke.style.isEraser ? StrokeType.dotted : StrokeType.solid,
+              type:
+                  protoStroke.style.isEraser
+                      ? StrokeType.dotted
+                      : StrokeType.solid,
             );
 
             return Stroke(
-              id: protoStroke.id, 
-              points: points, 
+              id: protoStroke.id,
+              points: points,
               startTime: DateTime.now().millisecondsSinceEpoch,
-              style: style
+              style: style,
             );
           }).toList();
 
@@ -103,16 +93,6 @@ class ProtobufConverter {
         updatedAt: DateTime.fromMillisecondsSinceEpoch(proto.updatedAt),
         strokes: strokes,
       );
-      */
-
-      // تا زمانی که فایل‌های protobuf تولید شوند، یک مقدار پیش‌فرض برمی‌گردانیم
-      return WhiteBoard(
-        id: 'temp',
-        name: 'Temporary WhiteBoard',
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-        strokes: [],
-      );
     } catch (e) {
       debugPrint('خطا در تبدیل از Protobuf: $e');
       rethrow;
@@ -121,22 +101,14 @@ class ProtobufConverter {
 
   /// تبدیل مدل داخلی به آرایه بایت Protobuf
   static Uint8List modelToBytes(WhiteBoard model) {
-    //final proto = convertToProto(model);
-    //return proto.writeToBuffer();
-    return Uint8List(0); // مقدار پیش‌فرض
+    final proto = convertToProto(model);
+    return proto.toBuffer();
   }
 
   /// تبدیل آرایه بایت Protobuf به مدل داخلی
   static WhiteBoard bytesToModel(Uint8List bytes) {
-    //final proto = pb.WhiteBoard.fromBuffer(bytes);
-    //return convertFromProto(proto);
-    return WhiteBoard(
-      id: 'temp',
-      name: 'Temporary WhiteBoard',
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-      strokes: [],
-    ); // مقدار پیش‌فرض
+    final proto = WhiteBoardProto.fromBuffer(bytes);
+    return convertFromProto(proto);
   }
 
   /// بهینه‌سازی داده‌ها با فشرده‌سازی نقاط (ذخیره تفاوت بین نقاط به جای مقادیر مطلق)

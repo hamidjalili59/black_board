@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
-import 'dart:ui' as ui;
-import '../models/drawing_model.dart';
+import '../models/drawing_model.dart' as drawing;
 import '../services/storage_service.dart';
 import '../services/grpc_service.dart';
+import 'package:uuid/uuid.dart';
+import '../models/white_board.dart';
+import '../models/stroke.dart';
+import '../models/point.dart';
+import '../models/stroke_style.dart';
+import '../services/protobuf_storage.dart';
 
 /// Provider مربوط به وایت‌بورد برای مدیریت وضعیت
 class WhiteBoardProvider extends ChangeNotifier {
@@ -17,7 +22,7 @@ class WhiteBoardProvider extends ChangeNotifier {
   Stroke? _currentStroke;
 
   // سبک خط فعلی
-  StrokeStyle _currentStyle = StrokeStyle.defaultStyle();
+  drawing.StrokeStyle _currentStyle = drawing.StrokeStyle.defaultStyle();
 
   // وضعیت بارگذاری
   bool _isLoading = false;
@@ -31,14 +36,22 @@ class WhiteBoardProvider extends ChangeNotifier {
   // لیست شناسه‌های وایت‌بوردهای ذخیره شده
   List<String> _savedWhiteBoardIds = [];
 
+  // تنظیمات قلم
+  StrokeStyle _strokeStyle = const StrokeStyle(
+    color: Color(0xFF000000),
+    thickness: 2.0,
+    type: StrokeType.solid,
+  );
+
   // گترها
   WhiteBoard? get whiteBoard => _whiteBoard;
-  StrokeStyle get currentStyle => _currentStyle;
+  drawing.StrokeStyle get currentStyle => _currentStyle;
   bool get isLoading => _isLoading;
   bool get isSaving => _isSaving;
   bool get isDrawing => _isDrawing;
   List<String> get savedWhiteBoardIds => _savedWhiteBoardIds;
   Stroke? get currentStroke => _currentStroke;
+  StrokeStyle get strokeStyle => _strokeStyle;
 
   WhiteBoardProvider() {
     _initialize();
@@ -53,10 +66,14 @@ class WhiteBoardProvider extends ChangeNotifier {
   }
 
   /// ایجاد وایت‌بورد جدید
-  void createNewWhiteBoard({String name = 'New Whiteboard'}) {
-    _whiteBoard = WhiteBoard(name: name, strokes: []);
-
-    _currentStroke = null;
+  void createNewWhiteBoard({String? name}) {
+    _whiteBoard = WhiteBoard(
+      id: const Uuid().v4(),
+      name: name ?? 'وایت‌بورد جدید',
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+      strokes: [],
+    );
     notifyListeners();
   }
 
@@ -65,14 +82,13 @@ class WhiteBoardProvider extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
 
-    final loaded = await _storageService.loadWhiteBoard(id);
-
-    if (loaded != null) {
-      _whiteBoard = loaded;
+    try {
+      final loadedWhiteBoard = await ProtobufStorage.loadWhiteBoard(id);
+      _whiteBoard = loadedWhiteBoard;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
-
-    _isLoading = false;
-    notifyListeners();
   }
 
   /// دریافت لیست وایت‌بوردهای ذخیره شده
@@ -80,10 +96,12 @@ class WhiteBoardProvider extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
 
-    _savedWhiteBoardIds = await _storageService.getWhiteBoardIds();
-
-    _isLoading = false;
-    notifyListeners();
+    try {
+      _savedWhiteBoardIds = await ProtobufStorage.getSavedWhiteBoardIds();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 
   /// ذخیره وایت‌بورد فعلی
@@ -93,25 +111,13 @@ class WhiteBoardProvider extends ChangeNotifier {
     _isSaving = true;
     notifyListeners();
 
-    final result = await _storageService.saveWhiteBoard(_whiteBoard!);
-
-    // اگر ذخیره موفقیت‌آمیز بود، به سرور هم ارسال می‌کنیم
-    if (result) {
-      // ارسال به سرور (اختیاری)
-      try {
-        await _grpcService.saveWhiteBoard(_whiteBoard!);
-      } catch (e) {
-        debugPrint('Failed to sync with server: $e');
-      }
-
-      // به‌روزرسانی لیست وایت‌بوردهای ذخیره شده
-      await loadSavedWhiteBoardIds();
+    try {
+      final result = await ProtobufStorage.saveWhiteBoard(_whiteBoard!);
+      return result;
+    } finally {
+      _isSaving = false;
+      notifyListeners();
     }
-
-    _isSaving = false;
-    notifyListeners();
-
-    return result;
   }
 
   /// تنظیم سبک خط فعلی
@@ -120,7 +126,7 @@ class WhiteBoardProvider extends ChangeNotifier {
     final newWidth = width ?? _currentStyle.width;
     final newSmoothness = smoothness ?? _currentStyle.smoothness;
 
-    _currentStyle = StrokeStyle(
+    _currentStyle = drawing.StrokeStyle(
       color: newColor,
       width: newWidth,
       smoothness: newSmoothness,
@@ -130,29 +136,31 @@ class WhiteBoardProvider extends ChangeNotifier {
   }
 
   /// شروع رسم خط جدید
-  void startStroke(ui.Offset position) {
+  void startStroke(Offset position) {
     if (_whiteBoard == null) {
       createNewWhiteBoard();
     }
 
-    final point = Point.fromOffset(position);
+    final point = Point(x: position.dx, y: position.dy, pressure: 1.0);
 
-    _currentStroke = Stroke(points: [point], style: _currentStyle);
+    _currentStroke = Stroke(
+      id: const Uuid().v4(),
+      points: [point],
+      startTime: DateTime.now().millisecondsSinceEpoch,
+      style: _strokeStyle,
+    );
 
-    _isDrawing = true;
     notifyListeners();
   }
 
   /// ادامه رسم خط
-  void updateStroke(ui.Offset position) {
-    if (!_isDrawing || _currentStroke == null) return;
+  void updateStroke(Offset position) {
+    if (_currentStroke == null) return;
 
-    final point = Point.fromOffset(position);
+    final point = Point(x: position.dx, y: position.dy, pressure: 1.0);
 
-    _currentStroke = Stroke(
-      id: _currentStroke!.id,
+    _currentStroke = _currentStroke!.copyWith(
       points: [..._currentStroke!.points, point],
-      style: _currentStroke!.style,
     );
 
     notifyListeners();
@@ -160,25 +168,29 @@ class WhiteBoardProvider extends ChangeNotifier {
 
   /// پایان رسم خط
   void endStroke() {
-    if (!_isDrawing || _currentStroke == null || _whiteBoard == null) return;
+    if (_whiteBoard == null || _currentStroke == null) return;
 
-    // اگر خط حداقل دو نقطه داشته باشد، آن را ذخیره می‌کنیم
-    if (_currentStroke!.points.length >= 2) {
-      _whiteBoard = _whiteBoard!.addStroke(_currentStroke!);
-    }
+    // اضافه کردن خط به وایت‌بورد
+    _whiteBoard = _whiteBoard!.copyWith(
+      strokes: [..._whiteBoard!.strokes, _currentStroke!],
+      updatedAt: DateTime.now(),
+    );
 
+    // پاک کردن خط جاری
     _currentStroke = null;
-    _isDrawing = false;
+
     notifyListeners();
   }
 
   /// پاک کردن وایت‌بورد
   void clearWhiteBoard() {
-    if (_whiteBoard == null) return;
-
-    _whiteBoard = _whiteBoard!.clearStrokes();
-    _currentStroke = null;
-    notifyListeners();
+    if (_whiteBoard != null) {
+      _whiteBoard = _whiteBoard!.copyWith(
+        strokes: [],
+        updatedAt: DateTime.now(),
+      );
+      notifyListeners();
+    }
   }
 
   /// حذف آخرین خط
@@ -188,7 +200,29 @@ class WhiteBoardProvider extends ChangeNotifier {
     final strokes = List<Stroke>.from(_whiteBoard!.strokes);
     strokes.removeLast();
 
-    _whiteBoard = _whiteBoard!.copyWith(strokes: strokes);
+    _whiteBoard = _whiteBoard!.copyWith(
+      strokes: strokes,
+      updatedAt: DateTime.now(),
+    );
+
+    notifyListeners();
+  }
+
+  // تغییر ضخامت قلم
+  void setThickness(double thickness) {
+    _strokeStyle = _strokeStyle.copyWith(thickness: thickness);
+    notifyListeners();
+  }
+
+  // تغییر رنگ قلم
+  void setColor(Color color) {
+    _strokeStyle = _strokeStyle.copyWith(color: color);
+    notifyListeners();
+  }
+
+  // تغییر نوع قلم
+  void setStrokeType(StrokeType type) {
+    _strokeStyle = _strokeStyle.copyWith(type: type);
     notifyListeners();
   }
 }

@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'providers/whiteboard_provider.dart';
-import 'views/whiteboard_screen.dart';
+import 'providers/protobuf_whiteboard_provider.dart';
+import 'views/protobuf_whiteboard_screen.dart';
+import 'views/protobuf_test_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,7 +26,9 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (context) => WhiteBoardProvider()),
+        ChangeNotifierProvider(
+          create: (context) => ProtobufWhiteBoardProvider(),
+        ),
       ],
       child: MaterialApp(
         title: 'وایت‌بورد هوشمند',
@@ -50,7 +53,10 @@ class MyApp extends StatelessWidget {
           GlobalWidgetsLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
         ],
-        home: const WhiteBoardScreen(),
+        routes: {
+          '/': (context) => const ProtobufWhiteBoardScreen(),
+          '/protobuf_test': (context) => const ProtobufTestScreen(),
+        },
       ),
     );
   }

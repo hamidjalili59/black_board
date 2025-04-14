@@ -1,28 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/whiteboard_provider.dart';
-import '../widgets/drawing_canvas.dart';
-import '../widgets/stroke_settings_panel.dart';
+import '../providers/protobuf_whiteboard_provider.dart';
+import '../widgets/drawing_canvas_protobuf.dart';
+import '../widgets/stroke_settings_panel_protobuf.dart';
 
-/// صفحه اصلی وایت‌بورد
-class WhiteBoardScreen extends StatefulWidget {
-  const WhiteBoardScreen({Key? key}) : super(key: key);
+/// صفحه اصلی وایت‌بورد با پروتوباف
+class ProtobufWhiteBoardScreen extends StatefulWidget {
+  const ProtobufWhiteBoardScreen({super.key});
 
   @override
-  State<WhiteBoardScreen> createState() => _WhiteBoardScreenState();
+  State<ProtobufWhiteBoardScreen> createState() =>
+      _ProtobufWhiteBoardScreenState();
 }
 
-class _WhiteBoardScreenState extends State<WhiteBoardScreen> {
+class _ProtobufWhiteBoardScreenState extends State<ProtobufWhiteBoardScreen> {
   bool _showSettings = false;
 
   @override
   Widget build(BuildContext context) {
-    final provider = Provider.of<WhiteBoardProvider>(context);
+    final provider = Provider.of<ProtobufWhiteBoardProvider>(context);
     final whiteBoard = provider.whiteBoard;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('وایت‌بورد'),
+        title: const Text('وایت‌بورد پروتوباف'),
         actions: [
           // دکمه ذخیره
           IconButton(
@@ -65,6 +66,14 @@ class _WhiteBoardScreenState extends State<WhiteBoardScreen> {
                     : () {
                       provider.undoLastStroke();
                     },
+          ),
+
+          IconButton(
+            icon: const Icon(Icons.data_object),
+            onPressed: () {
+              Navigator.pushNamed(context, '/protobuf_test');
+            },
+            tooltip: 'تست Protobuf',
           ),
         ],
       ),
@@ -149,7 +158,10 @@ class _WhiteBoardScreenState extends State<WhiteBoardScreen> {
 
   /// دیالوگ تایید برای پاک کردن وایت‌بورد
   Future<void> _showClearConfirmationDialog(BuildContext context) async {
-    final provider = Provider.of<WhiteBoardProvider>(context, listen: false);
+    final provider = Provider.of<ProtobufWhiteBoardProvider>(
+      context,
+      listen: false,
+    );
 
     final result = await showDialog<bool>(
       context: context,
@@ -179,7 +191,10 @@ class _WhiteBoardScreenState extends State<WhiteBoardScreen> {
 
   /// دیالوگ ایجاد وایت‌بورد جدید
   Future<void> _showNewWhiteBoardDialog(BuildContext context) async {
-    final provider = Provider.of<WhiteBoardProvider>(context, listen: false);
+    final provider = Provider.of<ProtobufWhiteBoardProvider>(
+      context,
+      listen: false,
+    );
     final nameController = TextEditingController(text: 'وایت‌بورد جدید');
 
     final result = await showDialog<bool>(
@@ -214,7 +229,10 @@ class _WhiteBoardScreenState extends State<WhiteBoardScreen> {
 
   /// دیالوگ بارگیری وایت‌بورد
   Future<void> _showLoadWhiteBoardDialog(BuildContext context) async {
-    final provider = Provider.of<WhiteBoardProvider>(context, listen: false);
+    final provider = Provider.of<ProtobufWhiteBoardProvider>(
+      context,
+      listen: false,
+    );
 
     // بارگیری لیست وایت‌بوردها
     await provider.loadSavedWhiteBoardIds();
@@ -262,7 +280,7 @@ class _WhiteBoardScreenState extends State<WhiteBoardScreen> {
       await provider.loadWhiteBoard(selectedId);
 
       // نمایش پیام متناسب با نتیجه بارگذاری
-      if (provider.whiteBoard != null) {
+      if (provider.whiteBoard != null && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -271,7 +289,7 @@ class _WhiteBoardScreenState extends State<WhiteBoardScreen> {
             backgroundColor: Colors.green,
           ),
         );
-      } else {
+      } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('خطا در بارگذاری وایت‌بورد با شناسه $selectedId'),

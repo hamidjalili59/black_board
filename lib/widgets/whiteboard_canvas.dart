@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/whiteboard_provider.dart';
-import '../models/drawing_model.dart';
+import '../models/stroke.dart';
 
 /// ویجت کنوس وایت‌بورد برای رسم خطوط
 class WhiteBoardCanvas extends StatelessWidget {
-  const WhiteBoardCanvas({Key? key}) : super(key: key);
+  final Color backgroundColor;
+
+  const WhiteBoardCanvas({super.key, this.backgroundColor = Colors.white});
 
   @override
   Widget build(BuildContext context) {
@@ -14,12 +16,13 @@ class WhiteBoardCanvas extends StatelessWidget {
       onPanUpdate: (details) => _handlePanUpdate(context, details),
       onPanEnd: (details) => _handlePanEnd(context),
       child: Container(
-        color: Colors.white,
+        color: backgroundColor,
         width: double.infinity,
         height: double.infinity,
         child: CustomPaint(
           painter: WhiteBoardPainter(
             provider: Provider.of<WhiteBoardProvider>(context),
+            backgroundColor: backgroundColor,
           ),
         ),
       ),
@@ -45,15 +48,19 @@ class WhiteBoardCanvas extends StatelessWidget {
 /// کلاس طراح (painter) برای رسم خطوط روی کنوس
 class WhiteBoardPainter extends CustomPainter {
   final WhiteBoardProvider provider;
+  final Color backgroundColor;
 
-  WhiteBoardPainter({required this.provider}) : super(repaint: provider);
+  WhiteBoardPainter({
+    required this.provider,
+    this.backgroundColor = Colors.white,
+  }) : super(repaint: provider);
 
   @override
   void paint(Canvas canvas, Size size) {
     // رنگ پس‌زمینه
     canvas.drawRect(
       Rect.fromLTWH(0, 0, size.width, size.height),
-      Paint()..color = Colors.white,
+      Paint()..color = backgroundColor,
     );
 
     final whiteBoard = provider.whiteBoard;
@@ -87,14 +94,35 @@ class WhiteBoardPainter extends CustomPainter {
 
     final paint =
         Paint()
-          ..color = Color(stroke.style.color)
-          ..strokeWidth = stroke.style.width
+          ..color = stroke.style.color
+          ..strokeWidth = stroke.style.thickness
           ..strokeCap = StrokeCap.round
           ..strokeJoin = StrokeJoin.round
           ..style = PaintingStyle.stroke;
 
-    // استفاده از path برای رسم نرم خطوط
-    final path = stroke.toPath();
+    // رسم نقاط به صورت مستقیم
+    if (stroke.points.length < 2) {
+      // اگر فقط یک نقطه داریم، یک دایره کوچک رسم می‌کنیم
+      if (stroke.points.length == 1) {
+        final point = stroke.points[0];
+        canvas.drawCircle(
+          Offset(point.x, point.y),
+          stroke.style.thickness / 2,
+          paint,
+        );
+      }
+      return;
+    }
+
+    // ایجاد مسیر برای رسم خط
+    final path = Path();
+    path.moveTo(stroke.points[0].x, stroke.points[0].y);
+
+    // رسم خط میان نقاط
+    for (int i = 1; i < stroke.points.length; i++) {
+      path.lineTo(stroke.points[i].x, stroke.points[i].y);
+    }
+
     canvas.drawPath(path, paint);
   }
 

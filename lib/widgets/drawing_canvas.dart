@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:ui' as ui;
 import '../models/drawing_model.dart';
 
 /// ویجت کنوس اختصاصی برای رسم خطوط با قابلیت تنظیم نرمی

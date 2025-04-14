@@ -3,26 +3,23 @@ import '../models/stroke.dart';
 import '../models/stroke_style.dart';
 import '../models/white_board.dart';
 import 'dart:ui';
+import '../generated/proto_models.dart';
 // import drawing.pb.dart تا زمانی که تولید شود
 
 /// کلاس مسئول تبدیل مدل‌های داخلی به Protobuf و برعکس
 class ProtoConverter {
   /// تبدیل مدل نقطه داخلی به Protobuf
-  static dynamic pointToProto(Point point) {
-    // تا زمانی که کلاس‌های protobuf تولید شوند، اینجا کامنت می‌ماند
-    /*
-    return blackboard.Point(
+  static PointProto pointToProto(Point point) {
+    return PointProto(
       x: point.x,
       y: point.y,
       pressure: point.pressure,
-      timestamp: DateTime.now().millisecondsSinceEpoch, // چون point timestamp ندارد
+      timestamp: DateTime.now().millisecondsSinceEpoch,
     );
-    */
-    return null;
   }
 
   /// تبدیل مدل نقطه Protobuf به مدل داخلی
-  static Point pointFromProto(dynamic protoPoint) {
+  static Point pointFromProto(PointProto protoPoint) {
     return Point(
       x: protoPoint.x,
       y: protoPoint.y,
@@ -31,20 +28,16 @@ class ProtoConverter {
   }
 
   /// تبدیل مدل سبک خط داخلی به Protobuf
-  static dynamic strokeStyleToProto(StrokeStyle style) {
-    // تا زمانی که کلاس‌های protobuf تولید شوند، اینجا کامنت می‌ماند
-    /*
-    return blackboard.StrokeStyle(
+  static StrokeStyleProto strokeStyleToProto(StrokeStyle style) {
+    return StrokeStyleProto(
       color: style.color.value.toRadixString(16).padLeft(8, '0'),
-      width: style.thickness, // width به thickness تغییر کرده
-      isEraser: style.type == StrokeType.dotted, // isEraser وجود ندارد، یک مثال جایگزین
+      width: style.thickness,
+      isEraser: style.type == StrokeType.dotted,
     );
-    */
-    return null;
   }
 
   /// تبدیل مدل سبک خط Protobuf به مدل داخلی
-  static StrokeStyle strokeStyleFromProto(dynamic protoStyle) {
+  static StrokeStyle strokeStyleFromProto(StrokeStyleProto protoStyle) {
     return StrokeStyle(
       color: Color(int.parse(protoStyle.color, radix: 16)),
       thickness: protoStyle.width,
@@ -53,78 +46,50 @@ class ProtoConverter {
   }
 
   /// تبدیل مدل خط داخلی به Protobuf
-  static dynamic strokeToProto(Stroke stroke) {
-    // تا زمانی که کلاس‌های protobuf تولید شوند، اینجا کامنت می‌ماند
-    /*
-    final protoStroke = blackboard.Stroke(
+  static StrokeProto strokeToProto(Stroke stroke) {
+    final protoPoints = stroke.points.map(pointToProto).toList();
+    return StrokeProto(
       id: stroke.id,
+      points: protoPoints,
       style: strokeStyleToProto(stroke.style),
     );
-
-    for (final point in stroke.points) {
-      protoStroke.points.add(pointToProto(point));
-    }
-
-    return protoStroke;
-    */
-    return null;
   }
 
   /// تبدیل مدل خط Protobuf به مدل داخلی
-  static Stroke strokeFromProto(dynamic protoStroke) {
-    final points = protoStroke.points.map((p) => pointFromProto(p)).toList();
+  static Stroke strokeFromProto(StrokeProto protoStroke) {
+    final points = protoStroke.points.map(pointFromProto).toList();
 
     return Stroke(
       id: protoStroke.id,
       points: points,
-      startTime:
-          DateTime.now()
-              .millisecondsSinceEpoch, // چون کلاس Stroke نیاز به startTime دارد
+      startTime: DateTime.now().millisecondsSinceEpoch,
       style: strokeStyleFromProto(protoStroke.style),
     );
   }
 
   /// تبدیل مدل وایت‌بورد داخلی به Protobuf
-  static dynamic whiteBoardToProto(WhiteBoard whiteBoard) {
-    // تا زمانی که کلاس‌های protobuf تولید شوند، اینجا کامنت می‌ماند
-    /*
-    final protoWhiteBoard = blackboard.WhiteBoard(
+  static WhiteBoardProto whiteBoardToProto(WhiteBoard whiteBoard) {
+    final protoStrokes = whiteBoard.strokes.map(strokeToProto).toList();
+
+    return WhiteBoardProto(
       id: whiteBoard.id,
       name: whiteBoard.name,
       createdAt: whiteBoard.createdAt.millisecondsSinceEpoch,
       updatedAt: whiteBoard.updatedAt.millisecondsSinceEpoch,
+      strokes: protoStrokes,
     );
-
-    for (final stroke in whiteBoard.strokes) {
-      protoWhiteBoard.strokes.add(strokeToProto(stroke));
-    }
-
-    return protoWhiteBoard;
-    */
-    return null;
   }
 
   /// تبدیل مدل وایت‌بورد Protobuf به مدل داخلی
-  static WhiteBoard whiteBoardFromProto(dynamic protoWhiteBoard) {
-    // تا زمانی که کلاس‌های protobuf تولید شوند، اینجا کامنت می‌ماند
-    /*
-    final strokes = protoWhiteBoard.strokes.map((s) => strokeFromProto(s)).toList();
+  static WhiteBoard whiteBoardFromProto(WhiteBoardProto protoWhiteBoard) {
+    final strokes = protoWhiteBoard.strokes.map(strokeFromProto).toList();
 
     return WhiteBoard(
       id: protoWhiteBoard.id,
       name: protoWhiteBoard.name,
-      createdAt: DateTime.fromMillisecondsSinceEpoch(protoWhiteBoard.createdAt.toInt()),
-      updatedAt: DateTime.fromMillisecondsSinceEpoch(protoWhiteBoard.updatedAt.toInt()),
+      createdAt: DateTime.fromMillisecondsSinceEpoch(protoWhiteBoard.createdAt),
+      updatedAt: DateTime.fromMillisecondsSinceEpoch(protoWhiteBoard.updatedAt),
       strokes: strokes,
-    );
-    */
-
-    return WhiteBoard(
-      id: 'temp',
-      name: 'Temporary',
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-      strokes: [],
     );
   }
 }

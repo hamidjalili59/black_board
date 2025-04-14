@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/whiteboard_provider.dart';
-import 'dart:ui' as ui;
 
 /// پنل تنظیمات خط با قابلیت تنظیم نرمی، رنگ و ضخامت
 class StrokeSettingsPanel extends StatelessWidget {

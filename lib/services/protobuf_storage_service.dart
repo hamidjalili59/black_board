@@ -2,11 +2,10 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
-import '../models/point.dart';
 import '../models/stroke.dart';
-import '../models/stroke_style.dart';
 import '../models/white_board.dart';
 import 'protobuf_converter.dart';
+import 'proto_buffer_serializer.dart';
 
 /// سرویس ذخیره‌سازی محلی Protobuf برای وایت‌بورد
 class ProtobufStorageService {
@@ -14,6 +13,8 @@ class ProtobufStorageService {
       ProtobufStorageService._internal();
   bool _isInitialized = false;
   late Directory _appDirectory;
+  static const String _fileExtension = '.pbwb'; // پسوند فایل پروتوباف وایت‌بورد
+  static const String _whiteboardsDir = 'whiteboards'; // دایرکتوری ذخیره‌سازی
 
   // سینگلتون پترن
   factory ProtobufStorageService() {
@@ -35,7 +36,7 @@ class ProtobufStorageService {
 
       // دریافت دایرکتوری برنامه
       _appDirectory = await getApplicationDocumentsDirectory();
-      final whiteboardDir = Directory('${_appDirectory.path}/whiteboards_pb');
+      final whiteboardDir = Directory('${_appDirectory.path}/$_whiteboardsDir');
 
       // اگر دایرکتوری وجود ندارد، آن را ایجاد می‌کنیم
       if (!await whiteboardDir.exists()) {
@@ -52,7 +53,19 @@ class ProtobufStorageService {
     }
   }
 
-  /// ذخیره وایت‌بورد به صورت Protobuf
+  /// دریافت مسیر دایرکتوری ذخیره‌سازی
+  Future<Directory> get _storageDirectory async {
+    final appDir = await getApplicationDocumentsDirectory();
+    final whiteboardsDir = Directory('${appDir.path}/$_whiteboardsDir');
+
+    if (!await whiteboardsDir.exists()) {
+      await whiteboardsDir.create(recursive: true);
+    }
+
+    return whiteboardsDir;
+  }
+
+  /// ذخیره وایت‌بورد
   Future<bool> saveWhiteBoard(WhiteBoard whiteBoard) async {
     if (!_isInitialized && !kIsWeb) {
       await initialize();
@@ -65,44 +78,28 @@ class ProtobufStorageService {
         return true;
       }
 
-      final dirPath = '${_appDirectory.path}/whiteboards_pb';
-      final dir = Directory(dirPath);
+      final storageDir = await _storageDirectory;
+      final file = File('${storageDir.path}/${whiteBoard.id}$_fileExtension');
 
-      // اطمینان از وجود دایرکتوری
-      if (!await dir.exists()) {
-        debugPrint('ایجاد دایرکتوری whiteboards_pb: $dirPath');
-        await dir.create(recursive: true);
-      }
+      // سریالایز کردن به پروتوباف
+      final bytes = ProtobufSerializer.serializeWhiteBoard(whiteBoard);
 
-      final filePath = '$dirPath/${whiteBoard.id}.pb';
-      final file = File(filePath);
+      // ذخیره در فایل
+      await file.writeAsBytes(bytes);
 
       debugPrint(
-        'ذخیره وایت‌بورد با شناسه ${whiteBoard.id} به صورت Protobuf در مسیر: $filePath',
+        'وایت‌بورد با شناسه ${whiteBoard.id} با موفقیت ذخیره شد. '
+        'اندازه: ${bytes.length} بایت',
       );
-      debugPrint('تعداد خطوط: ${whiteBoard.strokes.length}');
 
-      // بهینه‌سازی نقاط قبل از تبدیل به Protobuf
-      final optimizedWhiteBoard = _optimizeWhiteBoard(whiteBoard);
-
-      // تبدیل به Protobuf و ذخیره
-      final bytes = ProtobufConverter.modelToBytes(optimizedWhiteBoard);
-      debugPrint('اندازه فایل Protobuf: ${bytes.length} بایت');
-
-      await file.writeAsBytes(bytes, flush: true);
-
-      debugPrint(
-        'وایت‌بورد با موفقیت به صورت Protobuf ذخیره شد در: ${file.path}',
-      );
       return true;
-    } catch (e, stackTrace) {
-      debugPrint('خطا در ذخیره وایت‌بورد به صورت Protobuf: $e');
-      debugPrint('جزئیات خطا: $stackTrace');
+    } catch (e) {
+      debugPrint('خطا در ذخیره‌سازی وایت‌بورد: $e');
       return false;
     }
   }
 
-  /// بارگیری وایت‌بورد از فایل Protobuf
+  /// بارگیری وایت‌بورد با شناسه
   Future<WhiteBoard?> loadWhiteBoard(String id) async {
     if (!_isInitialized && !kIsWeb) {
       await initialize();
@@ -115,37 +112,34 @@ class ProtobufStorageService {
         return null;
       }
 
-      final filePath = '${_appDirectory.path}/whiteboards_pb/$id.pb';
-      final file = File(filePath);
-
-      debugPrint('تلاش برای خواندن وایت‌بورد از فایل Protobuf: $filePath');
+      final storageDir = await _storageDirectory;
+      final file = File('${storageDir.path}/$id$_fileExtension');
 
       if (!await file.exists()) {
-        debugPrint('فایل Protobuf وایت‌بورد یافت نشد: $filePath');
+        debugPrint('فایل وایت‌بورد با شناسه $id یافت نشد.');
         return null;
       }
 
-      debugPrint('فایل Protobuf وایت‌بورد یافت شد. در حال خواندن...');
+      // خواندن بایت‌ها از فایل
       final bytes = await file.readAsBytes();
-      debugPrint('اندازه فایل Protobuf: ${bytes.length} بایت');
 
-      final whiteBoard = ProtobufConverter.bytesToModel(bytes);
-      debugPrint('وایت‌بورد با موفقیت از Protobuf بارگیری شد.');
-      debugPrint('تعداد خطوط بارگیری شده: ${whiteBoard.strokes.length}');
+      // دسریالایز کردن از پروتوباف
+      final whiteBoard = ProtobufSerializer.deserializeWhiteBoard(bytes);
 
-      // اگر داده‌ها بهینه‌سازی شده بودند، باید به حالت اصلی برگردند
-      final decompressedWhiteBoard = _decompressWhiteBoard(whiteBoard);
+      debugPrint(
+        'وایت‌بورد با شناسه $id با موفقیت بارگیری شد. '
+        'تعداد خطوط: ${whiteBoard.strokes.length}',
+      );
 
-      return decompressedWhiteBoard;
-    } catch (e, stackTrace) {
-      debugPrint('خطا در بارگیری وایت‌بورد از Protobuf: $e');
-      debugPrint('جزئیات خطا: $stackTrace');
+      return whiteBoard;
+    } catch (e) {
+      debugPrint('خطا در بارگیری وایت‌بورد: $e');
       return null;
     }
   }
 
-  /// دریافت لیست وایت‌بوردهای ذخیره شده
-  Future<List<String>> getWhiteBoardIds() async {
+  /// دریافت فهرست شناسه‌های وایت‌بوردهای ذخیره شده
+  Future<List<String>> getSavedWhiteBoardIds() async {
     if (!_isInitialized && !kIsWeb) {
       await initialize();
     }
@@ -157,56 +151,58 @@ class ProtobufStorageService {
         return [];
       }
 
-      final dirPath = '${_appDirectory.path}/whiteboards_pb';
-      final dir = Directory(dirPath);
+      final storageDir = await _storageDirectory;
+      final List<FileSystemEntity> files = await storageDir.list().toList();
 
-      debugPrint(
-        'تلاش برای خواندن لیست وایت‌بوردهای Protobuf از مسیر: $dirPath',
-      );
-
-      if (!await dir.exists()) {
-        debugPrint('دایرکتوری وایت‌بوردهای Protobuf وجود ندارد: $dirPath');
-        return [];
-      }
-
-      final files = await dir.list().toList();
-      debugPrint('تعداد فایل‌های Protobuf یافت شده: ${files.length}');
-
-      // لاگ مسیر تمام فایل‌ها
-      for (var file in files) {
-        debugPrint(
-          'فایل Protobuf یافت شده: ${file.path}, نوع: ${file is File ? "File" : "Directory"}',
-        );
-      }
-
-      // استخراج شناسه‌ها از نام فایل‌ها
+      // فیلتر کردن فایل‌ها بر اساس پسوند و استخراج شناسه‌ها
       final ids =
           files
-              .where((entity) => entity is File && entity.path.endsWith('.pb'))
+              .whereType<File>()
+              .where((file) => file.path.endsWith(_fileExtension))
               .map((file) {
-                // استفاده از Platform.pathSeparator برای سازگاری با همه سیستم‌عامل‌ها
-                final pathParts = file.path.split(Platform.pathSeparator);
-                final fileName =
-                    pathParts.isNotEmpty
-                        ? pathParts.last
-                        : file.path.split('/').last;
-                final id = fileName.substring(
+                final fileName = file.path.split('/').last;
+                return fileName.substring(
                   0,
-                  fileName.length - 3,
-                ); // حذف پسوند .pb
-                debugPrint(
-                  'شناسه Protobuf استخراج شده: $id از فایل: $fileName',
+                  fileName.length - _fileExtension.length,
                 );
-                return id;
               })
               .toList();
 
-      debugPrint('تعداد شناسه‌های Protobuf استخراج شده: ${ids.length}');
+      debugPrint('تعداد ${ids.length} وایت‌بورد ذخیره شده یافت شد.');
       return ids;
-    } catch (e, stackTrace) {
-      debugPrint('خطا در دریافت لیست وایت‌بوردهای Protobuf: $e');
-      debugPrint('جزئیات خطا: $stackTrace');
+    } catch (e) {
+      debugPrint('خطا در دریافت لیست وایت‌بوردها: $e');
       return [];
+    }
+  }
+
+  /// حذف وایت‌بورد با شناسه
+  Future<bool> deleteWhiteBoard(String id) async {
+    if (!_isInitialized && !kIsWeb) {
+      await initialize();
+    }
+
+    try {
+      if (kIsWeb) {
+        // برای وب، از localStorage استفاده می‌کنیم
+        // در این مثال پیاده‌سازی نشده است
+        return false;
+      }
+
+      final storageDir = await _storageDirectory;
+      final file = File('${storageDir.path}/$id$_fileExtension');
+
+      if (!await file.exists()) {
+        debugPrint('فایل وایت‌بورد با شناسه $id برای حذف یافت نشد.');
+        return false;
+      }
+
+      await file.delete();
+      debugPrint('وایت‌بورد با شناسه $id با موفقیت حذف شد.');
+      return true;
+    } catch (e) {
+      debugPrint('خطا در حذف وایت‌بورد: $e');
+      return false;
     }
   }
 

@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'dart:math' as math;
 
 import 'point.dart';
 import 'stroke_style.dart';
@@ -75,7 +76,7 @@ class Stroke {
     return total;
   }
 
-  /// محاسبه مرزهای خط (مستطیل دربرگیرنده)
+  /// محاسبه محدوده مستطیل احاطه‌کننده خط
   Rect get bounds {
     if (points.isEmpty) {
       return Rect.zero;
@@ -87,19 +88,19 @@ class Stroke {
     double maxY = double.negativeInfinity;
 
     for (final point in points) {
-      if (point.x < minX) minX = point.x;
-      if (point.y < minY) minY = point.y;
-      if (point.x > maxX) maxX = point.x;
-      if (point.y > maxY) maxY = point.y;
+      minX = math.min(minX, point.x);
+      minY = math.min(minY, point.y);
+      maxX = math.max(maxX, point.x);
+      maxY = math.max(maxY, point.y);
     }
 
-    // اضافه کردن نصف ضخامت خط به هر طرف مرز
-    final halfThickness = style.thickness / 2;
+    // اضافه کردن نصف ضخامت به هر طرف برای در نظر گرفتن ضخامت خط
+    final halfWidth = style.thickness / 2;
     return Rect.fromLTRB(
-      minX - halfThickness,
-      minY - halfThickness,
-      maxX + halfThickness,
-      maxY + halfThickness,
+      minX - halfWidth,
+      minY - halfWidth,
+      maxX + halfWidth,
+      maxY + halfWidth,
     );
   }
 
