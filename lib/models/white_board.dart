@@ -40,7 +40,7 @@ class WhiteBoard {
 
     int maxEndTime = 0;
     // شروع با بیشترین مقدار ممکن برای زمان
-    int minStartTime = 9223372036854775807; // مقدار ماکزیمم int
+    int minStartTime = double.maxFinite.toInt(); // مقدار ماکزیمم int
 
     for (final stroke in strokes) {
       // اگر زمان پایان این استروک از حداکثر زمان بیشتر است، به‌روزرسانی کنیم

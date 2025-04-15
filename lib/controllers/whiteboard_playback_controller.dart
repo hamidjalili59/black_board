@@ -44,6 +44,8 @@ class WhiteBoardPlaybackController extends ChangeNotifier {
     debugPrint("تعداد خطوط: ${_absoluteBoard.strokes.length}");
     debugPrint("زمان مرجع: $_baseTime");
     debugPrint("مدت کل: ${_calculateTotalDuration()} میلی‌ثانیه");
+    debugPrint("وضعیت دلتا اصلی: ${originalWhiteBoard.isDeltaEncoded}");
+    debugPrint("وضعیت دلتا مطلق: ${_absoluteBoard.isDeltaEncoded}");
 
     // اگر خطی وجود دارد، اطلاعات خط اول را نمایش دهیم
     if (_absoluteBoard.strokes.isNotEmpty) {
@@ -54,6 +56,17 @@ class WhiteBoardPlaybackController extends ChangeNotifier {
       debugPrint(
         "نسبت به زمان مرجع: شروع: ${firstStroke.startTime - _baseTime}, پایان: ${firstStroke.endTime - _baseTime}",
       );
+      debugPrint(
+        "وضعیت دلتا خط اول: ${firstStroke.isDeltaEncoded}, تعداد نقاط: ${firstStroke.points.length}",
+      );
+
+      if (firstStroke.points.isNotEmpty) {
+        final firstPoint = firstStroke.points.first;
+        debugPrint("نقطه اول: $firstPoint");
+      }
+
+      // بررسی زمان‌بندی نقاط برای تشخیص مشکلات
+      _inspectPoints();
     }
 
     // مطمئن شویم زمان جاری صفر است
@@ -66,7 +79,7 @@ class WhiteBoardPlaybackController extends ChangeNotifier {
     if (_absoluteBoard.strokes.isEmpty) return 0;
 
     // شروع با بیشترین مقدار ممکن برای زمان
-    int minStartTime = 9223372036854775807; // مقدار ماکزیمم int
+    int minStartTime = double.maxFinite.toInt(); // مقدار ماکزیمم int
     for (final stroke in _absoluteBoard.strokes) {
       if (stroke.startTime < minStartTime) {
         minStartTime = stroke.startTime;
@@ -271,5 +284,47 @@ class WhiteBoardPlaybackController extends ChangeNotifier {
   void dispose() {
     _timer?.cancel();
     super.dispose();
+  }
+
+  // بررسی زمان‌بندی نقاط برای دیباگ
+  void _inspectPoints() {
+    debugPrint("\n====== بررسی نقاط برای دیباگ ======");
+
+    for (int i = 0; i < _absoluteBoard.strokes.length; i++) {
+      final stroke = _absoluteBoard.strokes[i];
+
+      debugPrint("\nبررسی خط $i با ${stroke.points.length} نقطه:");
+      debugPrint("زمان شروع خط: ${stroke.startTime}");
+      debugPrint("زمان پایان خط: ${stroke.endTime}");
+
+      if (stroke.points.isNotEmpty) {
+        // بررسی اولین و آخرین نقطه
+        final firstPoint = stroke.points.first;
+        final lastPoint = stroke.points.last;
+
+        debugPrint(
+          "اولین نقطه: timestamp=${firstPoint.timestamp}, isDelta=${firstPoint.isDelta}",
+        );
+        debugPrint(
+          "آخرین نقطه: timestamp=${lastPoint.timestamp}, isDelta=${lastPoint.isDelta}",
+        );
+
+        // بررسی timestamp همه نقاط
+        int countZeroTimestamp = 0;
+        for (final p in stroke.points) {
+          if (p.timestamp == 0) countZeroTimestamp++;
+        }
+
+        if (countZeroTimestamp > 0) {
+          debugPrint(
+            "!!هشدار!! $countZeroTimestamp نقطه با timestamp صفر وجود دارد",
+          );
+        }
+      } else {
+        debugPrint("خط بدون نقطه!");
+      }
+    }
+
+    debugPrint("====== پایان بررسی نقاط ======\n");
   }
 }

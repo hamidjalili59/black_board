@@ -15,6 +15,7 @@ class ProtobufSerializer {
     // y: field_number = 2, wire_type = 1 (64-bit)
     // pressure: field_number = 3, wire_type = 1 (64-bit)
     // timestamp: field_number = 4, wire_type = 0 (varint)
+    // isDelta: field_number = 5, wire_type = 0 (varint)
 
     final builder = BytesBuilder();
 
@@ -30,12 +31,22 @@ class ProtobufSerializer {
     builder.addByte(0x19); // tag: 3 << 3 | 1
     builder.add(_encodeDouble(point.pressure));
 
+    // timestamp (field 4) - int (varint)
+    builder.addByte(0x20); // tag: 4 << 3 | 0
+    builder.add(_encodeVarint(point.timestamp));
+
+    // isDelta (field 5) - bool (varint)
+    builder.addByte(0x28); // tag: 5 << 3 | 0
+    builder.add(_encodeVarint(point.isDelta ? 1 : 0));
+
     return builder.toBytes();
   }
 
   /// تبدیل پروتوباف به نقطه
   static Point deserializePoint(Uint8List data) {
-    double x = 0, y = 0, pressure = 0;
+    double x = 0, y = 0, pressure = 1.0;
+    int timestamp = 0;
+    bool isDelta = false;
     int pos = 0;
 
     while (pos < data.length) {
@@ -61,11 +72,17 @@ class ProtobufSerializer {
         }
       } else if (wireType == 0) {
         // Varint
-        // پرش از داده‌های varint
-        while (data[pos] & 0x80 != 0) {
-          pos++;
+        final value = _decodeVarint(data, pos);
+        pos += value.bytesRead;
+
+        switch (fieldNumber) {
+          case 4: // timestamp
+            timestamp = value.result;
+            break;
+          case 5: // isDelta
+            isDelta = value.result == 1;
+            break;
         }
-        pos++;
       } else {
         // پرش از فیلد ناشناخته
         final length = data[pos++];
@@ -73,7 +90,13 @@ class ProtobufSerializer {
       }
     }
 
-    return Point(x: x, y: y, pressure: pressure);
+    return Point(
+      x: x,
+      y: y,
+      pressure: pressure,
+      timestamp: timestamp,
+      isDelta: isDelta,
+    );
   }
 
   /// تبدیل استایل خط به پروتوباف
@@ -212,7 +235,12 @@ class ProtobufSerializer {
     return Stroke(
       id: id,
       points: points,
-      startTime: DateTime.now().millisecondsSinceEpoch,
+      startTime:
+          points.isEmpty
+              ? DateTime.now().millisecondsSinceEpoch
+              : points.isNotEmpty && points[0].timestamp > 0
+              ? DateTime.now().millisecondsSinceEpoch - points.last.timestamp
+              : DateTime.now().millisecondsSinceEpoch,
       style:
           style ??
           StrokeStyle(
@@ -223,20 +251,21 @@ class ProtobufSerializer {
     );
   }
 
-  /// تبدیل وایت‌بورد به پروتوباف
+  /// سریالایز کردن وایت‌بورد به پروتوباف
   static Uint8List serializeWhiteBoard(WhiteBoard whiteBoard) {
+    // builder for byte construction
     final builder = BytesBuilder();
 
     // id (field 1) - string
-    final idBytes = utf8.encode(whiteBoard.id);
     builder.addByte(0x0A); // tag: 1 << 3 | 2
-    builder.addByte(idBytes.length);
+    final idBytes = utf8.encode(whiteBoard.id);
+    builder.add(_encodeVarint(idBytes.length));
     builder.add(idBytes);
 
     // name (field 2) - string
-    final nameBytes = utf8.encode(whiteBoard.name);
     builder.addByte(0x12); // tag: 2 << 3 | 2
-    builder.addByte(nameBytes.length);
+    final nameBytes = utf8.encode(whiteBoard.name);
+    builder.add(_encodeVarint(nameBytes.length));
     builder.add(nameBytes);
 
     // createdAt (field 3) - int64
@@ -255,6 +284,16 @@ class ProtobufSerializer {
       builder.add(strokeData);
     }
 
+    // isDeltaEncoded (field 6) - bool
+    builder.addByte(0x30); // tag: 6 << 3 | 0
+    builder.add(_encodeVarint(whiteBoard.isDeltaEncoded ? 1 : 0));
+
+    // duration (field 7) - int64 - optional
+    if (whiteBoard.duration > 0) {
+      builder.addByte(0x38); // tag: 7 << 3 | 0
+      builder.add(_encodeVarint(whiteBoard.duration));
+    }
+
     return builder.toBytes();
   }
 
@@ -265,6 +304,7 @@ class ProtobufSerializer {
     int createdAt = 0;
     int updatedAt = 0;
     final strokes = <Stroke>[];
+    bool isDeltaEncoded = false; // مقدار پیش‌فرض
     int pos = 0;
 
     while (pos < data.length) {
@@ -281,6 +321,9 @@ class ProtobufSerializer {
             createdAt = value.result;
           } else if (fieldNumber == 4) {
             updatedAt = value.result;
+          } else if (fieldNumber == 6) {
+            // فیلد 6 برای isDeltaEncoded
+            isDeltaEncoded = value.result == 1;
           }
           break;
         case 2: // length-delimited
@@ -311,12 +354,21 @@ class ProtobufSerializer {
       }
     }
 
+    // محاسبه مدت زمان کل
+    int? duration = null;
+    if (strokes.isNotEmpty) {
+      // اجازه دهیم WhiteBoard خودش مدت زمان را محاسبه کند
+      duration = null;
+    }
+
     return WhiteBoard(
       id: id,
       name: name,
       createdAt: DateTime.fromMillisecondsSinceEpoch(createdAt),
       updatedAt: DateTime.fromMillisecondsSinceEpoch(updatedAt),
       strokes: strokes,
+      isDeltaEncoded: isDeltaEncoded,
+      duration: duration,
     );
   }
 
