@@ -170,8 +170,13 @@ class WhiteBoardPlaybackController extends ChangeNotifier {
     );
 
     final visibleStrokes = <Stroke>[];
+    bool hasVisibleStrokes = false;
 
-    for (final stroke in _absoluteBoard.strokes) {
+    // مرتب‌سازی استروک‌ها بر اساس زمان شروع
+    final sortedStrokes = List<Stroke>.from(_absoluteBoard.strokes)
+      ..sort((a, b) => a.startTime.compareTo(b.startTime));
+
+    for (final stroke in sortedStrokes) {
       // فقط خطوطی که شروع شده‌اند را بررسی کنیم
       if (stroke.startTime <= absoluteTime) {
         // لیست نقاط قابل نمایش تا زمان جاری را دریافت کنیم
@@ -187,6 +192,7 @@ class WhiteBoardPlaybackController extends ChangeNotifier {
               endTime: stroke.endTime,
             ),
           );
+          hasVisibleStrokes = true;
         }
       }
     }
@@ -203,6 +209,16 @@ class WhiteBoardPlaybackController extends ChangeNotifier {
     );
 
     debugPrint("تعداد خطوط قابل نمایش: ${visibleStrokes.length}");
+    if (hasVisibleStrokes && visibleStrokes.isNotEmpty) {
+      final firstStroke = visibleStrokes.first;
+      final lastStroke = visibleStrokes.last;
+      debugPrint(
+        "اولین خط قابل نمایش - شروع: ${firstStroke.startTime}, پایان: ${firstStroke.endTime}",
+      );
+      debugPrint(
+        "آخرین خط قابل نمایش - شروع: ${lastStroke.startTime}, پایان: ${lastStroke.endTime}",
+      );
+    }
   }
 
   // دریافت نقاط قابل نمایش یک خط تا زمان مشخص
@@ -215,10 +231,27 @@ class WhiteBoardPlaybackController extends ChangeNotifier {
     // زمان نسبی برای فیلتر کردن نقاط
     final relativeTime = currentTime - stroke.startTime;
 
-    // فیلتر کردن نقاط بر اساس زمان نسبی
-    return stroke.points
-        .where((point) => point.timestamp <= relativeTime)
-        .toList();
+    // بررسی آیا همه timestamp‌های نقاط صفر هستند
+    bool allZeroTimestamps = stroke.points.every((p) => p.timestamp == 0);
+
+    if (allZeroTimestamps) {
+      // اگر همه timestamp‌ها صفر هستند، نقاط را به صورت تدریجی نمایش می‌دهیم
+      // بر اساس درصد گذشت زمان نسبی از کل زمان خط
+
+      int strokeDuration = stroke.endTime - stroke.startTime;
+      if (strokeDuration <= 0) return []; // اجتناب از تقسیم بر صفر
+
+      double progress = relativeTime / strokeDuration.toDouble();
+      int visibleCount = (stroke.points.length * progress).round();
+      visibleCount = visibleCount.clamp(0, stroke.points.length);
+
+      return stroke.points.sublist(0, visibleCount);
+    } else {
+      // حالت عادی - فیلتر کردن بر اساس timestamp
+      return stroke.points
+          .where((point) => point.timestamp <= relativeTime)
+          .toList();
+    }
   }
 
   // متدهای اضافی برای سازگاری با ویجت‌های مختلف

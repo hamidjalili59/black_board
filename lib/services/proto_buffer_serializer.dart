@@ -193,6 +193,18 @@ class ProtobufSerializer {
     builder.addByte(styleData.length);
     builder.add(styleData);
 
+    // startTime (field 4) - int64 (varint)
+    builder.addByte(0x20); // tag: 4 << 3 | 0
+    builder.add(_encodeVarint(stroke.startTime));
+
+    // endTime (field 5) - int64 (varint)
+    builder.addByte(0x28); // tag: 5 << 3 | 0
+    builder.add(_encodeVarint(stroke.endTime));
+
+    // isDeltaEncoded (field 6) - bool (varint)
+    builder.addByte(0x30); // tag: 6 << 3 | 0
+    builder.add(_encodeVarint(stroke.isDeltaEncoded ? 1 : 0));
+
     return builder.toBytes();
   }
 
@@ -201,6 +213,9 @@ class ProtobufSerializer {
     String id = "";
     final points = <Point>[];
     StrokeStyle? style;
+    int startTime = 0;
+    int endTime = 0;
+    bool isDeltaEncoded = false;
     int pos = 0;
 
     while (pos < data.length) {
@@ -226,21 +241,58 @@ class ProtobufSerializer {
         }
 
         pos += length;
+      } else if (wireType == 0) {
+        // varint
+        final value = _decodeVarint(data, pos);
+        pos += value.bytesRead;
+
+        switch (fieldNumber) {
+          case 4: // startTime
+            startTime = value.result;
+            break;
+          case 5: // endTime
+            endTime = value.result;
+            break;
+          case 6: // isDeltaEncoded
+            isDeltaEncoded = value.result == 1;
+            break;
+        }
       } else {
         // پرش از فیلد ناشناخته
         pos += (wireType == 0) ? 1 : (wireType == 1 ? 8 : data[pos++]);
       }
     }
 
+    // اگر زمان شروع تنظیم نشده باشد و نقاط غیر صفر داریم
+    if (startTime == 0 &&
+        points.isNotEmpty &&
+        points.any((p) => p.timestamp > 0)) {
+      // محاسبه زمان تقریبی بر اساس زمان اولین نقطه
+      startTime =
+          DateTime.now().millisecondsSinceEpoch - points.first.timestamp;
+    } else if (startTime == 0) {
+      // اگر هیچ نقطه‌ای با timestamp غیر صفر نداریم
+      startTime = DateTime.now().millisecondsSinceEpoch;
+    }
+
+    // اگر زمان پایان تنظیم نشده باشد، محاسبه بر اساس آخرین نقطه
+    if (endTime == 0 && points.isNotEmpty) {
+      int maxTimestamp = 0;
+      for (final point in points) {
+        if (point.timestamp > maxTimestamp) {
+          maxTimestamp = point.timestamp;
+        }
+      }
+      endTime = startTime + maxTimestamp;
+    } else if (endTime == 0) {
+      // اگر نقطه‌ای نداریم یا همه timestamp صفر هستند
+      endTime = startTime;
+    }
+
     return Stroke(
       id: id,
       points: points,
-      startTime:
-          points.isEmpty
-              ? DateTime.now().millisecondsSinceEpoch
-              : points.isNotEmpty && points[0].timestamp > 0
-              ? DateTime.now().millisecondsSinceEpoch - points.last.timestamp
-              : DateTime.now().millisecondsSinceEpoch,
+      startTime: startTime,
       style:
           style ??
           StrokeStyle(
@@ -248,6 +300,7 @@ class ProtobufSerializer {
             thickness: 2.0,
             type: StrokeType.solid,
           ),
+      isDeltaEncoded: isDeltaEncoded,
     );
   }
 
